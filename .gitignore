@@ -1,0 +1,5 @@
+.vscode/
+venv/
+*.log
+__debug*
+go-smtp-relay
