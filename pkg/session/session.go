@@ -10,7 +10,6 @@ import (
 
 const testUser = "testUser"
 const testPassword = "testPassword"
-const workerCount = 3
 
 type Session struct {
 	To       []string
@@ -36,11 +35,7 @@ func (s *Session) Data(r io.Reader) error {
 		s.Contents = buffer
 	}
 	sendChan := make(chan *SendTask, len(s.To))
-	workers := make([]*Worker, workerCount)
-	for i := range workerCount {
-		workers[i] = NewWorker(sendChan)
-		go workers[i].SendWithRetries()
-	}
+	go NewWorker(sendChan).SendWithRetries()
 	for _, to := range s.To {
 		sendChan <- &SendTask{To: to, From: s.From, Contents: s.Contents}
 	}

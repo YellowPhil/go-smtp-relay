@@ -10,7 +10,9 @@ import (
 	"github.com/yellowphil/go-smtp-relay/pkg/errors"
 )
 
-type Client struct{}
+type Client struct {
+	Auth smtp.Auth
+}
 
 func MXLookup(domain string) ([]*net.MX, error) {
 	mxRecords, err := net.LookupMX(domain)
