@@ -5,16 +5,16 @@ import (
 	"log"
 
 	"github.com/emersion/go-smtp"
-	errors "github.com/yellowphil/go-smtp-relay/pkg/errors"
+	"github.com/yellowphil/go-smtp-relay/pkg/config"
+	"github.com/yellowphil/go-smtp-relay/pkg/errors"
 )
-
-const testUser = "testUser"
-const testPassword = "testPassword"
 
 type Session struct {
 	To       []string
 	From     string
 	Contents []byte
+	Cfg      config.Config
+	client   Client
 }
 
 func (s *Session) Mail(from string, opts *smtp.MailOptions) error {
@@ -34,19 +34,14 @@ func (s *Session) Data(r io.Reader) error {
 	} else {
 		s.Contents = buffer
 	}
-	sendChan := make(chan *SendTask, len(s.To))
-	go NewWorker(sendChan).SendWithRetries()
 	for _, to := range s.To {
-		sendChan <- &SendTask{To: to, From: s.From, Contents: s.Contents}
+		s.client.Send(to, s.From, s.Contents, s.Cfg.Retries)
 	}
-	close(sendChan)
-
 	return nil
 }
 
 func (s *Session) Auth(username, password string) error {
-	// TODO: change before release
-	if username != testUser && password != testPassword {
+	if username != s.Cfg.Creds.Username && password != s.Cfg.Creds.Password {
 		return &errors.AuthFailError{Username: username}
 	}
 	return nil
@@ -55,7 +50,7 @@ func (s *Session) Auth(username, password string) error {
 func (s *Session) Reset() {
 	s.From = ""
 	s.To = []string{}
-	s.Contents = []byte{}
+	s.Contents = nil
 }
 
 func (s *Session) Logout() error {
