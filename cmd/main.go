@@ -10,23 +10,23 @@ import (
 )
 
 type Backend struct {
-	cfg config.Config
+	cfg *config.Config
 }
 
 func (b *Backend) NewSession(_ *smtp.Conn) (smtp.Session, error) {
 	return &session.Session{
-		Cfg: b.cfg,
+		Cfg: *b.cfg,
 	}, nil
 }
 
-func SMTPServer(listenAddr string, domain string, debug bool) *smtp.Server {
-	server := smtp.NewServer(&Backend{})
-	server.Domain = domain
-	server.Addr = listenAddr
+func SMTPServer(config *config.Config) *smtp.Server {
+	server := smtp.NewServer(&Backend{cfg: config})
+	server.Domain = config.Connection.ListenDomain
+	server.Addr = config.Connection.ListenAddr
 	server.WriteTimeout = 10 * time.Second
 	server.ReadTimeout = 10 * time.Second
 
-	server.AllowInsecureAuth = debug
+	server.AllowInsecureAuth = config.Connection.AllowInsecureAuth
 	server.MaxMessageBytes = 1024 * 1024
 	server.MaxRecipients = 20
 
@@ -35,7 +35,11 @@ func SMTPServer(listenAddr string, domain string, debug bool) *smtp.Server {
 }
 
 func main() {
-	server := SMTPServer("127.0.0.1:2525", "localhost", true)
+	cfg, err := config.NewConfigFromFile("./config.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+	server := SMTPServer(cfg)
 
 	log.Println("Starting server at", server.Addr)
 	if err := server.ListenAndServe(); err != nil {
