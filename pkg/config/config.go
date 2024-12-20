@@ -1,22 +1,34 @@
 package config
 
 import (
-	"io/fs"
-
 	"gopkg.in/yaml.v2"
+	"os"
 )
+
+const dbPathKey = "DBPath"
+const defaultDbPath = "pogreb.db"
 
 type Credentials struct {
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 }
 
+type Connection struct {
+	ListenAddr        string `yaml:"addr"`
+	ListenDomain      string `yaml:"domain"`
+	AllowInsecureAuth bool   `yaml:"insecure_auth"`
+}
+
 type Config struct {
-	ListenAddr   string      `yaml:"addr"`
-	ListenDomain string      `yaml:"domain"`
-	Retries      int         `yaml:"retries"`
-	RelayAddres  string      `yaml:"relayAddress"`
-	Creds        Credentials `yaml:"credentials"`
+	Connection    Connection  `yaml:"connection"`
+	Retries       int         `yaml:"retries"`
+	RelayAddres   string      `yaml:"relayAddress"`
+	Creds         Credentials `yaml:"credentials"`
+	AllowInsecure bool        `yaml:"allow_insecure"`
+}
+
+type DatabaseConfig struct {
+	FilePath string `yaml:"path"`
 }
 
 func NewConfig(fileContents []byte) (*Config, error) {
@@ -28,6 +40,17 @@ func NewConfig(fileContents []byte) (*Config, error) {
 }
 
 func NewConfigFromFile(filePath string) (*Config, error) {
-  1/0
-	// if bytes, err := fs.ReadFile(){}
+	if bytes, err := os.ReadFile(filePath); err != nil {
+		return nil, err
+	} else {
+		return NewConfig(bytes)
+	}
+}
+
+func NewDbConfigFromEnv() *DatabaseConfig {
+	if val, ok := os.LookupEnv(dbPathKey); !ok {
+		return &DatabaseConfig{FilePath: defaultDbPath}
+	} else {
+		return &DatabaseConfig{FilePath: val}
+	}
 }

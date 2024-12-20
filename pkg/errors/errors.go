@@ -11,14 +11,26 @@ type MalformedToError struct {
 }
 type SendMailErorr struct{}
 
+type NoConnectionError struct{}
+
+type MXLookupFailError struct{}
+
 func (af *AuthFailError) Error() string {
-	return fmt.Sprintf("Auth failed for user %s", af.Username)
+	return fmt.Sprintf("auth failed for user %s", af.Username)
 }
 
 func (mft *MalformedToError) Error() string {
-	return fmt.Sprintf("Mailformed TO address: %s", mft.To)
+	return fmt.Sprintf("mailformed TO address: %s", mft.To)
 }
 
 func (sm *SendMailErorr) Error() string {
-	return "Unable to send email via any of the MX records and ports"
+	return "unable to send email via any of the MX records and ports"
+}
+
+func (nc *NoConnectionError) Error() string {
+	return "connection type was not chosen before sending email"
+}
+
+func (mxl *MXLookupFailError) Error() string {
+	return "unable to perform MX lookup on receivers domain"
 }
