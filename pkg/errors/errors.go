@@ -9,7 +9,7 @@ type AuthFailError struct {
 type MalformedToError struct {
 	To string
 }
-type SendMailErorr struct{}
+type SendMailError struct{}
 
 type NoConnectionError struct{}
 
@@ -23,7 +23,7 @@ func (mft *MalformedToError) Error() string {
 	return fmt.Sprintf("mailformed TO address: %s", mft.To)
 }
 
-func (sm *SendMailErorr) Error() string {
+func (sm *SendMailError) Error() string {
 	return "unable to send email via any of the MX records and ports"
 }
 

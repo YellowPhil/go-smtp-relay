@@ -26,7 +26,6 @@ func HandleRegister(ctx fiber.Ctx) error {
 }
 
 func HandleLogin(ctx fiber.Ctx) error {
-	sess := session.FromContext(ctx)
 	lr := new(LoginRequest)
 	if err := ctx.Bind().Body(lr); err != nil {
 		return err
