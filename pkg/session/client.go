@@ -1,16 +1,17 @@
 package session
 
 import (
-	"crypto/tls"
 	"fmt"
+	"github.com/yellowphil/go-smtp-relay/pkg/errors"
 	"net"
 	"net/smtp"
 	"strings"
-
-	"github.com/yellowphil/go-smtp-relay/pkg/errors"
 )
 
-type Client struct{}
+type Client struct {
+	smtp       *smtp.Client
+	connection Connection
+}
 
 func MXLookup(domain string) ([]*net.MX, error) {
 	mxRecords, err := net.LookupMX(domain)
@@ -20,14 +21,24 @@ func MXLookup(domain string) ([]*net.MX, error) {
 	return mxRecords, nil
 }
 
-func (c *Client) sendMail(client *smtp.Client, from, to string, data []byte) error {
-	if err := client.Mail(from); err != nil {
+func (c *Client) UseSMTPS() {
+	c.connection = &SMTPSConnection{}
+}
+func (c *Client) UseSTARTTLS() {
+	c.connection = &STARTTLSConnection{}
+}
+func (c *Client) UseInsecure() {
+	c.connection = &InsecureConnection{}
+}
+
+func (c *Client) sendMail(from, to string, data []byte) error {
+	if err := c.smtp.Mail(from); err != nil {
 		return err
 	}
-	if err := client.Rcpt(to); err != nil {
+	if err := c.smtp.Rcpt(to); err != nil {
 		return err
 	}
-	writer, err := client.Data()
+	writer, err := c.smtp.Data()
 	if err != nil {
 		writer.Close()
 		return err
@@ -36,10 +47,13 @@ func (c *Client) sendMail(client *smtp.Client, from, to string, data []byte) err
 		writer.Close()
 		return err
 	}
-  return writer.Close()
+	return writer.Close()
 }
 
 func (c *Client) SendMail(from, to string, data []byte) error {
+	if c.connection == nil {
+		return &errors.NoConnectionError{}
+	}
 	toParts := strings.Split(to, "@")
 	if len(toParts) != 2 {
 		return &errors.MalformedToError{To: to}
@@ -47,62 +61,21 @@ func (c *Client) SendMail(from, to string, data []byte) error {
 	domain := toParts[1]
 	mxRecords, err := MXLookup(domain)
 	if err != nil {
-		return err
+		return &errors.MXLookupFailError{}
 	}
 
 	for _, mx := range mxRecords {
-		host := mx.Host
-		// use this sequence to go from most to less secure
-		for _, port := range []int{587, 465, 25} {
-			addr := fmt.Sprintf("%s:%d", host, port)
-			var client *smtp.Client
-			var err error
+		var host = mx.Host
+		var smtpClient *smtp.Client
+		var err error
 
-			switch port {
-			case 587:
-				// SMTPS
-				tlsConfig := &tls.Config{ServerName: host}
-				conn, err := tls.Dial("tcp", addr, tlsConfig)
-				if err != nil {
-					continue
-				}
-				client, err = smtp.NewClient(conn, host)
-				if err != nil {
-					continue
-				}
-
-			case 25, 465:
-				client, err = smtp.Dial(addr)
-				if err != nil {
-					continue
-				}
-
-				if port == 587 {
-					if err = client.StartTLS(&tls.Config{ServerName: host}); err != nil {
-						client.Close()
-						continue
-					}
-				}
-			}
-			if err != nil {
-				continue
-			}
-			if err := c.sendMail(client, to, from, data); err != nil {
-				continue
-			}
-			client.Quit()
+		if smtpClient, err = c.connection.Connect(host); err != nil {
+			continue
+		}
+		c.smtp = smtpClient
+		if err = c.sendMail(from, to, data); err == nil {
 			return nil
 		}
 	}
 	return &errors.SendMailErorr{}
-}
-
-func (c *Client) Send(to, from string, data []byte, retries int) {
-	go func() {
-		for range retries {
-			if err := c.SendMail(from, to, data); err != nil {
-				return
-			}
-		}
-	}()
 }

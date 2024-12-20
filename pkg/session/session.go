@@ -19,12 +19,13 @@ type Session struct {
 
 func (s *Session) Mail(from string, opts *smtp.MailOptions) error {
 	log.Println("Mail from:", from)
+
 	s.From = from
 	return nil
 }
 func (s *Session) Rcpt(to string, options *smtp.RcptOptions) error {
 	log.Println("Rcpt to: ", to)
-	s.To = append(s.To, to)
+
 	return nil
 }
 
@@ -35,7 +36,21 @@ func (s *Session) Data(r io.Reader) error {
 		s.Contents = buffer
 	}
 	for _, to := range s.To {
-		s.client.Send(to, s.From, s.Contents, s.Cfg.Retries)
+		s.client.UseSMTPS()
+		if err := s.client.SendMail(s.From, to, s.Contents); err == nil {
+			continue
+		}
+		s.client.UseSTARTTLS()
+		if err := s.client.SendMail(s.From, to, s.Contents); err == nil {
+			continue
+		}
+		if s.Cfg.AllowInsecure {
+			s.client.UseInsecure()
+			if err := s.client.SendMail(s.From, to, s.Contents); err == nil {
+				continue
+			}
+		}
+		log.Printf("ERROR: could not send an email to %s\n", to)
 	}
 	return nil
 }
